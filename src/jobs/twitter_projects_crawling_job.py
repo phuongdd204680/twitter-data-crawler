@@ -53,16 +53,13 @@ class TwitterProjectCrawlingJob(CLIJob):
         self.api = None
         self.exporter = exporter
         self.projects = projects
-        self.projects_file = self.load_projects_from_file(projects_file) if self.load_projects_from_file(projects_file) is not [] else projects
+        self.projects_file = self.load_projects_from_file(projects_file) if projects_file is not None else projects
 
     @staticmethod
     def load_projects_from_file(projects_file: str) -> list:
-        if projects_file is not None:
-            with open(projects_file, 'r') as file:
-                projects_data = json.load(file)
-            return projects_data
-        else:
-            return []
+        with open(projects_file, 'r') as file:
+            projects_data = json.load(file)
+        return projects_data
 
     @staticmethod
     def convert_user_to_dict(user: User) -> dict:
