@@ -1,5 +1,6 @@
 import asyncio
 import time
+import json
 from typing import AsyncGenerator, TypeVar
 
 import pycountry
@@ -27,6 +28,7 @@ class TwitterProjectCrawlingJob(CLIJob):
             period: int,
             limit: int,
             projects: list,
+            projects_file: str,
             exporter: MongoDB,
             collection: str,
             user_name: str = AccountConfig.USERNAME,
@@ -51,6 +53,16 @@ class TwitterProjectCrawlingJob(CLIJob):
         self.api = None
         self.exporter = exporter
         self.projects = projects
+        self.projects_file = self.load_projects_from_file(projects_file) if self.load_projects_from_file(projects_file) is [] else projects
+
+    @staticmethod
+    def load_projects_from_file(projects_file: str) -> list:
+        if projects_file is not None:
+            with open(projects_file, 'r') as file:
+                projects_data = json.load(file)
+            return projects_data
+        else:
+            return []
 
     @staticmethod
     def convert_user_to_dict(user: User) -> dict:
@@ -158,10 +170,11 @@ class TwitterProjectCrawlingJob(CLIJob):
         )
         await api.pool.login_all()
 
-        for project in self.projects:
+        # for project in self.projects:
+        for project in self.projects_file:
             begin = time.time()
-            if project not in Projects.mapping:
-                continue
+            # if project not in Projects.mapping:
+            #     continue
 
             if "projects" in self.stream_types:
                 logger.info(f"Crawling {project} project info")
@@ -172,7 +185,7 @@ class TwitterProjectCrawlingJob(CLIJob):
             if "tweets" in self.stream_types:
                 begin = time.time()
                 logger.info(f"Crawling {project} tweets info")
-                project_info = await api.user_by_login(Projects.mapping.get(project))
+                project_info = await api.user_by_login(project)
                 if project_info is None:
                     continue
                 if self.limit is None:

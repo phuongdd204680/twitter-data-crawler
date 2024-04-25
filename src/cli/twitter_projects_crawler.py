@@ -16,7 +16,8 @@ logger = get_logger('Twitter Projects Crawler')
 @click.option('-li', '--limit', default=None, type=int, help='Sleep time')
 @click.option('-o', '--output-url', default=None, type=str, help='mongo output url')
 @click.option('-col', '--collection', default=MongoCollection.tweets, type=str, help='mongo output collection')
-@click.option('-p', '--projects', default=["trava"], type=str, help='project name', multiple=True)
+@click.option('-p', '--projects', default=["trava_finance"], type=str, help='project name', multiple=True)
+@click.option('-pf', '--projects-file', default=None, type=str, help='projects file')
 @click.option('-u', '--twitter-user', default=AccountConfig.USERNAME, show_default=True,
               type=str, help='Twitter user')
 @click.option('-pw', '--twitter-password', default=AccountConfig.PASSWORD, show_default=True,
@@ -29,14 +30,15 @@ logger = get_logger('Twitter Projects Crawler')
               type=str, help='email password')
 @click.option('-st', '--stream-types', default=["projects", "tweets", "followers"], show_default=True,
               type=str, multiple=True, help='Stream types: projects, tweets, followers')
-def twitter_projects_crawler(interval, period, limit, collection, output_url, projects, twitter_user, twitter_password,
-                             email, email_password, stream_types, twitter_key):
+def twitter_projects_crawler(interval, period, limit, collection, output_url, projects, projects_file, twitter_user,
+                             twitter_password, email, email_password, stream_types, twitter_key):
     _exporter = MongoDB(connection_url=output_url, database="cdp_database")
     job = TwitterProjectCrawlingJob(
         interval=interval,
         period=period,
         limit=limit,
         projects=projects,
+        projects_file=projects_file,
         exporter=_exporter,
         user_name=twitter_user,
         password=twitter_password,
