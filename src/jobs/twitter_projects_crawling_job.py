@@ -53,7 +53,7 @@ class TwitterProjectCrawlingJob(CLIJob):
         self.api = None
         self.exporter = exporter
         self.projects = projects
-        self.projects_file = self.load_projects_from_file(projects_file) if self.load_projects_from_file(projects_file) is [] else projects
+        self.projects_file = self.load_projects_from_file(projects_file) if self.load_projects_from_file(projects_file) is not [] else projects
 
     @staticmethod
     def load_projects_from_file(projects_file: str) -> list:
@@ -169,7 +169,6 @@ class TwitterProjectCrawlingJob(CLIJob):
             self.email_password
         )
         await api.pool.login_all()
-
         # for project in self.projects:
         for project in self.projects_file:
             begin = time.time()
