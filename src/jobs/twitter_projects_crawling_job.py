@@ -180,7 +180,7 @@ class TwitterProjectCrawlingJob(CLIJob):
 
             if "tweets" in self.stream_types:
                 begin = time.time()
-                logger.info(f"Crawling {project} tweets info")
+                # logger.info(f"Crawling {project} tweets info")
                 project_info = await api.user_by_login(project)
                 if project_info is None:
                     continue
@@ -193,7 +193,8 @@ class TwitterProjectCrawlingJob(CLIJob):
                 for tweet in tweets:
                     self.exporter.update_docs(self.collection, [self.convert_tweets_to_dict(tweet)])
 
-                logger.info(f"Crawl {project} tweets info in {time.time() - begin}s")
+                # logger.info(f"Crawl {project} tweets info in {time.time() - begin}s")
+                logger.info(f"Crawled {self.projects_file.index(project) + 1}/{len(self.projects_file)} projects")
 
             if "followers" in self.stream_types:
                 logger.info(f"Crawling {project} followers info")
