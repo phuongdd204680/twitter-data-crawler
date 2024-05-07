@@ -1,6 +1,6 @@
 import click
-
-from constants.config import AccountConfig
+from keybert import KeyBERT
+from constants.config import AccountConfig, MongoDBConfig
 from constants.time_constant import TimeConstants
 from constants.mongo_constant import MongoCollection
 from databases.mongodb import MongoDB
@@ -14,8 +14,8 @@ logger = get_logger('Twitter Projects Crawler')
 @click.option('-i', '--interval', default=TimeConstants.A_DAY, type=int, help='Sleep time')
 @click.option('-pe', '--period', default=TimeConstants.DAYS_2, type=int, help='Sleep time')
 @click.option('-li', '--limit', default=None, type=int, help='Sleep time')
-@click.option('-o', '--output-url', default=None, type=str, help='mongo output url')
-@click.option('-col', '--collection', default=MongoCollection.tweets, type=str, help='mongo output collection')
+@click.option('-o', '--output-url', default=MongoDBConfig.CONNECTION_URL, type=str, help='mongo output url')
+@click.option('-col', '--collection', type=str, help='mongo output collection')
 @click.option('-p', '--projects', default=["trava_finance"], type=str, help='project name', multiple=True)
 @click.option('-pf', '--projects-file', default=None, type=str, help='projects file')
 @click.option('-u', '--twitter-user', default=AccountConfig.USERNAME, show_default=True,
@@ -32,7 +32,9 @@ logger = get_logger('Twitter Projects Crawler')
               type=str, multiple=True, help='Stream types: projects, tweets, followers')
 def twitter_projects_crawler(interval, period, limit, collection, output_url, projects, projects_file, twitter_user,
                              twitter_password, email, email_password, stream_types, twitter_key):
-    _exporter = MongoDB(connection_url=output_url, database="cdp_database")
+    _exporter = MongoDB(connection_url=output_url, database=MongoDBConfig.DATABASE)
+    kw_model = KeyBERT(model='all-mpnet-base-v2')
+
     job = TwitterProjectCrawlingJob(
         interval=interval,
         period=period,
@@ -40,6 +42,7 @@ def twitter_projects_crawler(interval, period, limit, collection, output_url, pr
         projects=projects,
         projects_file=projects_file,
         exporter=_exporter,
+        kw_model=kw_model,
         user_name=twitter_user,
         password=twitter_password,
         key=twitter_key,

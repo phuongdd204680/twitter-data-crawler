@@ -11,7 +11,7 @@ class MongoDBConfig:
     USERNAME = os.environ.get("MONGODB_USERNAME", "root")
     PASSWORD = os.environ.get("MONGODB_PASSWORD", "dev123")
     CONNECTION_URL = os.getenv("MONGODB_CONNECTION_URL") or f"mongodb@{USERNAME}:{PASSWORD}@http://{HOST}:{PORT}"
-    DATABASE = os.getenv('MONGODB_DATABASE', 'klg_database')
+    DATABASE = os.getenv('MONGODB_DATABASE')
 
 
 class AccountConfig:

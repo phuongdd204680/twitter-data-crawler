@@ -1,12 +1,11 @@
 import asyncio
 import time
 import json
-from typing import AsyncGenerator, TypeVar
-
 import pycountry
-
+from constants.time_constant import TimeConstants
+from typing import AsyncGenerator, TypeVar
 from twscrape import User, Tweet, gather
-
+from keyphrase_vectorizers import KeyphraseCountVectorizer
 from constants.config import AccountConfig
 from constants.mongo_constant import MongoCollection
 from constants.time_constant import TimeConstants
@@ -24,6 +23,7 @@ logger = get_logger('Twitter Project Crawling Job')
 class TwitterProjectCrawlingJob(CLIJob):
     def __init__(
             self,
+            kw_model,
             interval: int,
             period: int,
             limit: int,
@@ -54,7 +54,7 @@ class TwitterProjectCrawlingJob(CLIJob):
         self.exporter = exporter
         self.projects = projects
         self.projects_file = self.load_projects_from_file(projects_file) if projects_file is not None else projects
-
+        self.kw_model = kw_model
     @staticmethod
     def load_projects_from_file(projects_file: str) -> list:
         with open(projects_file, 'r') as file:
@@ -105,7 +105,7 @@ class TwitterProjectCrawlingJob(CLIJob):
             }
         }
 
-    def convert_tweets_to_dict(self, tweet: Tweet) -> dict:
+    def convert_tweets_to_dict(self, tweet: Tweet, key_words: bool) -> dict:
         if not tweet:
             return {}
         result = {
@@ -123,10 +123,26 @@ class TwitterProjectCrawlingJob(CLIJob):
             Tweets.hash_tags: tweet.hashtags,
             Tweets.reply_counts: tweet.replyCount,
             Tweets.retweet_counts: tweet.retweetCount,
-            Tweets.retweeted_tweet: self.convert_tweets_to_dict(tweet.retweetedTweet),
+            Tweets.retweeted_tweet: self.convert_tweets_to_dict(tweet.retweetedTweet, False),
             Tweets.text: tweet.rawContent,
-            Tweets.quoted_tweet: self.convert_tweets_to_dict(tweet.quotedTweet),
+            Tweets.quoted_tweet: self.convert_tweets_to_dict(tweet.quotedTweet, False),
         }
+        if key_words== True:
+            tweet_txt = result[Tweets.text]
+            tweet_quoted_tweet = result[Tweets.quoted_tweet]
+            if 'text' in tweet_quoted_tweet:
+                txt = tweet_txt + '\n\n' +tweet_quoted_tweet['text']
+            else:
+                txt = tweet_txt
+            timmme = time.time() - result.get(Tweets.timestamp)
+            if (len(txt) >50) &(timmme<=14*TimeConstants.A_DAY):
+                try:
+                    keywords = self.kw_model.extract_keywords(txt,vectorizer=KeyphraseCountVectorizer(), top_n=23, use_mmr=True)
+                    keywords_lst = list(map(lambda x: x[0], keywords))     
+                    result[Tweets.key_word] = keywords_lst
+                except:
+                    keywords = []
+
         if time.time() - result.get(Tweets.timestamp) < self.period:
             result[Tweets.impression_logs] = {
                 str(int(time.time())): {
@@ -191,7 +207,7 @@ class TwitterProjectCrawlingJob(CLIJob):
                     tweets = await gather(api.user_tweets(project_info.id, limit=self.limit))
 
                 for tweet in tweets:
-                    self.exporter.update_docs(self.collection, [self.convert_tweets_to_dict(tweet)])
+                    self.exporter.update_docs(self.collection, [self.convert_tweets_to_dict(tweet, True)])
 
                 # logger.info(f"Crawl {project} tweets info in {time.time() - begin}s")
                 logger.info(f"Crawled {self.projects_file.index(project) + 1}/{len(self.projects_file)} projects")

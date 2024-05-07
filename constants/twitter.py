@@ -42,6 +42,7 @@ class Tweets:
     views = "views"
     user_mentions = "userMentions"
     impression_logs = "impressionLogs"
+    key_word = "keyWords"
 
 
 class Follow:
