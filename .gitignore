@@ -163,5 +163,5 @@ cython_debug/
 last_synced.txt
 
 data/
-
+notebook/
 .DS_Store

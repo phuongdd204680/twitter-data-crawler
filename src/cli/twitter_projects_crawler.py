@@ -11,8 +11,8 @@ logger = get_logger('Twitter Projects Crawler')
 
 
 @click.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.option('-i', '--interval', default=TimeConstants.A_DAY, type=int, help='Sleep time')
-@click.option('-pe', '--period', default=TimeConstants.DAYS_2, type=int, help='Sleep time')
+@click.option('-i', '--interval', default=TimeConstants.A_HOUR, type=int, help='Sleep time')
+@click.option('-pe', '--period', default=TimeConstants.A_HOUR, type=int, help='Sleep time')
 @click.option('-li', '--limit', default=None, type=int, help='Sleep time')
 @click.option('-o', '--output-url', default=MongoDBConfig.CONNECTION_URL, type=str, help='mongo output url')
 @click.option('-col', '--collection', type=str, help='mongo output collection')
