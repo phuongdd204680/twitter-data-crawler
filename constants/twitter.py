@@ -22,6 +22,8 @@ class TwitterUser:
     protected = "protected"
     verified = "verified"
     count_logs = "countLogs"
+    interaction_logs = "interactionLogs"
+    interaction_change_logs = "interactionChangeLogs"
 
 
 class Tweets:

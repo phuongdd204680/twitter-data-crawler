@@ -55,6 +55,7 @@ class TwitterProjectCrawlingJob(CLIJob):
         self.projects = projects
         self.projects_file = self.load_projects_from_file(projects_file) if projects_file is not None else projects
         self.kw_model = kw_model
+
     @staticmethod
     def load_projects_from_file(projects_file: str) -> list:
         with open(projects_file, 'r') as file:
@@ -62,7 +63,7 @@ class TwitterProjectCrawlingJob(CLIJob):
         return projects_data
 
     @staticmethod
-    def convert_user_to_dict(user: User) -> dict:
+    def convert_user_to_dict(user: User, interaction_logs, interaction_change_logs) -> dict:
         text = user.location
         country_name = ""
         for country in pycountry.countries:
@@ -102,6 +103,12 @@ class TwitterProjectCrawlingJob(CLIJob):
                     TwitterUser.followers_count: user.followersCount,
                     TwitterUser.statuses_count: user.statusesCount,
                 }
+            },
+            TwitterUser.interaction_logs: {
+                round_timestamp(time.time(), round_time=TimeConstants.A_HOUR): interaction_logs
+            },
+            TwitterUser.interaction_change_logs: {
+                round_timestamp(time.time(), round_time=TimeConstants.A_HOUR): interaction_change_logs
             }
         }
 
@@ -127,18 +134,19 @@ class TwitterProjectCrawlingJob(CLIJob):
             Tweets.text: tweet.rawContent,
             Tweets.quoted_tweet: self.convert_tweets_to_dict(tweet.quotedTweet, False),
         }
-        if key_words== True:
+        if key_words == True:
             tweet_txt = result[Tweets.text]
             tweet_quoted_tweet = result[Tweets.quoted_tweet]
             if 'text' in tweet_quoted_tweet:
-                txt = tweet_txt + '\n\n' +tweet_quoted_tweet['text']
+                txt = tweet_txt + '\n\n' + tweet_quoted_tweet['text']
             else:
                 txt = tweet_txt
             timmme = time.time() - result.get(Tweets.timestamp)
-            if (len(txt) >50) &(timmme<=14*TimeConstants.A_DAY):
+            if (len(txt) > 50) & (timmme <= 14 * TimeConstants.A_DAY):
                 try:
-                    keywords = self.kw_model.extract_keywords(txt,vectorizer=KeyphraseCountVectorizer(), top_n=23, use_mmr=True)
-                    keywords_lst = list(map(lambda x: x[0], keywords))     
+                    keywords = self.kw_model.extract_keywords(txt, vectorizer=KeyphraseCountVectorizer(), top_n=23,
+                                                              use_mmr=True)
+                    keywords_lst = list(map(lambda x: x[0], keywords))
                     result[Tweets.key_word] = keywords_lst
                 except:
                     keywords = []
@@ -173,6 +181,16 @@ class TwitterProjectCrawlingJob(CLIJob):
                 time.sleep(time_sleep)
         return tmp
 
+    @staticmethod
+    def get_interaction_change_logs(document, field):
+        now_time = str(round_timestamp(time.time(), round_time=3600))
+        previous_time = str(round_timestamp(time.time(), round_time=3600) - TimeConstants.A_HOUR)
+        if "interactionLogs" in document and previous_time in document["interactionLogs"] and now_time in document["interactionLogs"]:
+            change_log = document["interactionLogs"][now_time].get(field, 0) - document["interactionLogs"][previous_time].get(field, 0)
+        else:
+            change_log = 0
+        return change_log
+
     async def execute(self):
         api = NewAPi()
         await api.pool.add_account(
@@ -190,8 +208,52 @@ class TwitterProjectCrawlingJob(CLIJob):
 
             if "projects" in self.stream_types:
                 logger.info(f"Crawling {project} project info")
-                project_info = await api.user_by_login(Projects.mapping.get(project))
-                self.exporter.update_docs(MongoCollection.twitter_users, [self.convert_user_to_dict(project_info)])
+                project_info = await api.user_by_login(project)
+                if project_info is None:
+                    continue
+                if self.limit is None:
+                    # Get all tweet
+                    tweets = await gather(api.user_tweets(project_info.id, limit=project_info.statusesCount))
+                else:
+                    tweets = await gather(api.user_tweets(project_info.id, limit=self.limit))
+
+                views = 0
+                likes = 0
+                reply_counts = 0
+                retweet_counts = 0
+                for tweet in tweets:
+                    if tweet.date.timestamp() >= round_timestamp(time.time()) - TimeConstants.DAYS_2:
+                        views += tweet.viewCount
+                        likes += tweet.likeCount
+                        reply_counts += tweet.replyCount
+                        retweet_counts += tweet.retweetCount
+
+                views_change_log = 0
+                likes_change_log = 0
+                reply_change_log = 0
+                retweet_change_log = 0
+                list_tweets = list(self.exporter.get_docs(self.collection))
+                for document in list_tweets:
+                    views_change_log = self.get_interaction_change_logs(document, "views")
+                    likes_change_log = self.get_interaction_change_logs(document, "likes")
+                    reply_change_log = self.get_interaction_change_logs(document, "reply_counts")
+                    retweet_change_log = self.get_interaction_change_logs(document, "retweet_counts")
+
+                interaction_logs = {
+                    "views": views,
+                    "likes": likes,
+                    "reply_counts": reply_counts,
+                    "retweet_counts": retweet_counts,
+                }
+
+                interaction_change_logs = {
+                    "views": views_change_log,
+                    "likes": likes_change_log,
+                    "reply_counts": reply_change_log,
+                    "retweet_counts": retweet_change_log,
+                }
+
+                self.exporter.update_docs(self.collection, [self.convert_user_to_dict(project_info, interaction_logs, interaction_change_logs)])
                 logger.info(f"Crawl {project} projects info in {time.time() - begin}s")
 
             if "tweets" in self.stream_types:
